@@ -32,3 +32,6 @@ echo "$resp" | jq -r '.data.hits[] | [.file_id,.file_name,(.file_size|tostring)]
 
 echo "Found $(wc -l < "$OUT_TSV") WSI files (wrote $OUT_TSV)"
 head -n 5 "$OUT_TSV" || true
+
+
+awk -F '\t' '{sum+=$3} END {printf "Total size: %.2f GB\n", sum/1024/1024/1024}' wsi_files.tsv
