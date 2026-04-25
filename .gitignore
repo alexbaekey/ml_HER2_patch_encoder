@@ -1,3 +1,4 @@
 *.swp
-TCGA_WSI_50/
-
+HEROHE
+herohe_ihc2_runs*
+checkpoints
