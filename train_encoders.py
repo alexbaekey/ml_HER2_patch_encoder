@@ -40,19 +40,19 @@ OUT_DIR = Path("herohe_ihc2_runs")
 
 ENCODERS = [
     "ctranspath", # https://github.com/Xiyue-Wang/TransPath
-#    "resnet50",
-#    "vit_base_patch16_224",
-#    "convnext_base"
+    "resnet50",
+    "vit_base_patch16_224",
+    "convnext_base"
 ]
 
 PATCH_SIZE = 256
 TARGET_MAG = 20
-#MAX_PATCHES_PER_SLIDE = 2000 # first run
-#MAX_PATCHES_PER_SLIDE = 5000 # second run
-#MAX_PATCHES_PER_SLIDE = 10000 # third run
+MAX_PATCHES_PER_SLIDE = 50 # first run
+#MAX_PATCHES_PER_SLIDE = 100 # second run
+#MAX_PATCHES_PER_SLIDE = 500 # third run
 #MAX_PATCHES_PER_SLIDE = 1000 # fourth run
-#MAX_PATCHES_PER_SLIDE = 15000 # fourth run
-MAX_PATCHES_PER_SLIDE = 500 # fifth run
+#MAX_PATCHES_PER_SLIDE = 5000 # fourth run
+#MAX_PATCHES_PER_SLIDE = 10000 # fifth run
 
 
 BATCH_SIZE_PATCHES = 64
