@@ -25,6 +25,8 @@ import torchvision.transforms as T
 import timm
 import openslide
 
+# ctranspath
+from timm.layers import to_2tuple
 
 # ============================================================
 # CONFIG
@@ -37,10 +39,10 @@ TEST_XLSX = ROOT / "Test (ground truth).xlsx"
 OUT_DIR = Path("herohe_ihc2_runs")
 
 ENCODERS = [
-#    "ctranspath", # https://github.com/Xiyue-Wang/TransPath
-    "resnet50",
-    "vit_base_patch16_224",
-    "convnext_base"
+    "ctranspath", # https://github.com/Xiyue-Wang/TransPath
+#    "resnet50",
+#    "vit_base_patch16_224",
+#    "convnext_base"
 ]
 
 PATCH_SIZE = 256
@@ -226,6 +228,55 @@ def sample_coords(slide: openslide.OpenSlide, patch_size: int, max_patches: int,
 # ENCODERS
 # ============================================================
 
+class ConvStem(nn.Module):
+    def __init__(
+        self,
+        img_size=224,
+        patch_size=4,
+        in_chans=3,
+        embed_dim=768,
+        norm_layer=None,
+        flatten=True,
+        **kwargs
+    ):
+        super().__init__()
+        assert patch_size == 4
+        assert embed_dim % 8 == 0
+
+        img_size = to_2tuple(img_size)
+        patch_size = to_2tuple(patch_size)
+
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.grid_size = (img_size[0] // patch_size[0],
+                          img_size[1] // patch_size[1])
+        self.num_patches = self.grid_size[0] * self.grid_size[1]
+        self.flatten = flatten
+
+        stem = []
+        input_dim = 3
+        output_dim = embed_dim // 8
+
+        for _ in range(2):
+            stem.append(nn.Conv2d(input_dim, output_dim, kernel_size=3,
+                                  stride=2, padding=1, bias=False))
+            stem.append(nn.BatchNorm2d(output_dim))
+            stem.append(nn.ReLU(inplace=True))
+            input_dim = output_dim
+            output_dim *= 2
+
+        stem.append(nn.Conv2d(input_dim, embed_dim, kernel_size=1))
+
+        self.proj = nn.Sequential(*stem)
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+
+    def forward(self, x):
+        x = self.proj(x)                 # [B, C, H, W]
+        x = x.permute(0, 2, 3, 1)       # [B, H, W, C]
+        x = self.norm(x)
+        return x
+
+
 class FrozenEncoder(nn.Module):
     def __init__(self, name: str):
         super().__init__()
@@ -261,6 +312,54 @@ class FrozenEncoder(nn.Module):
                 T.Normalize(mean=(0.485, 0.456, 0.406),
                             std=(0.229, 0.224, 0.225)),
             ])
+
+        elif name == "ctranspath":
+            CKPT_PATH = "checkpoints/ctranspath.pth"
+
+            self.model = timm.create_model(
+                "swin_tiny_patch4_window7_224",
+                embed_layer=ConvStem,
+                pretrained=False,
+                num_classes=0,
+            )
+
+            ckpt = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
+            state_dict = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+
+            new_state = {}
+            for k, v in state_dict.items():
+                k = k.replace("module.", "").replace("encoder.", "")
+
+                # remove old timm buffers
+                if "relative_position_index" in k or "attn_mask" in k:
+                    continue
+
+                # old timm placed downsample at layer i;
+                # new timm places it at layer i+1
+                if k.startswith("layers.0.downsample."):
+                    k = k.replace("layers.0.downsample.", "layers.1.downsample.")
+                elif k.startswith("layers.1.downsample."):
+                    k = k.replace("layers.1.downsample.", "layers.2.downsample.")
+                elif k.startswith("layers.2.downsample."):
+                    k = k.replace("layers.2.downsample.", "layers.3.downsample.")
+
+                new_state[k] = v
+
+            missing, unexpected = self.model.load_state_dict(new_state, strict=False)
+
+            print("CTransPath missing keys:", len(missing))
+            print("CTransPath unexpected keys:", len(unexpected))
+
+            self.out_dim = self.model.num_features
+
+            self.transform = T.Compose([
+                T.Resize(224),
+                T.CenterCrop(224),
+                T.ToTensor(),
+                T.Normalize(mean=(0.485, 0.456, 0.406),
+                            std=(0.229, 0.224, 0.225)),
+            ])
+
 
         else:
             raise ValueError(f"Unknown encoder: {name}")
