@@ -1,4 +1,7 @@
 *.swp
 HEROHE
-herohe_ihc2_runs*
+herohe_ihc2*
 checkpoints
+herohe_data_exploration*
+reported_metrics/
+train_aggregation_methods.py
