@@ -15,6 +15,13 @@ pip install torch torchvision timm pandas openpyxl scikit-learn pillow tqdm open
 sudo apt-get install libopenslide0 openslide-tools
 ```
 
+# download the weights for the CTransPath encoder
+download link can be found at: https://github.com/Xiyue-Wang/TransPath
+```
+mkdir -p checkpoints
+mv /path/to/ctranspath.pth checkpoints/ctranspath.pth
+```
+
 # run with:
 
 ```python
